@@ -11,6 +11,12 @@ int curNumBands;
 
 float oscAmpThresh = 10;
 
+//for OSC
+import oscP5.*;
+import netP5.*;
+OscP5 oscP5;
+NetAddress myRemoteLocation;
+
 void setup()
 {
   size(512, 400);
@@ -30,6 +36,9 @@ void setup()
 
   textFont(createFont("SanSerif", 12));
   windowName = String.valueOf(numBands) + " bands";
+  
+  oscP5 = new OscP5(this, 12000);
+  myRemoteLocation = new NetAddress("127.0.0.1", 12345);
 }
 
 
@@ -52,7 +61,13 @@ void drawAverages() {
   {
     // draw a rectangle for each average, multiply the value by 5 so we can see it better
     //rect(i * w, height / 2, i * w + w, height / 2 - fft.getAvg(i) * scaleFactor);
+    if (fft.getAvg(i) > oscAmpThresh) {
+      fill(0, 255, 0);
+    }
     rect(i * w, height - fft.getAvg(i) * scaleFactor, w, fft.getAvg(i) * scaleFactor);
+    if (fft.getAvg(i) > oscAmpThresh) {
+      fill(255);
+    }
   }
   
   stroke(255, 0, 0);
@@ -63,8 +78,6 @@ void draw()
 {
   background(0);
     
-  //stroke(0, 0, 255);
-  
   if (curNumBands != numBands) {
     numBands = curNumBands;
     fft.linAverages(numBands);
@@ -78,7 +91,7 @@ void draw()
 
   //fill(255);
   // keep us informed about the window being used
-  text(windowName + "+/- changes bands", 5, 20);
+  text(windowName + " (+/- changes bands, u/d changes amplitude thresh)", 5, 20);
 }
 
 void keyReleased()
@@ -102,6 +115,13 @@ void keyReleased()
   else if (key == '-') {
     curNumBands--;
   }
+
+  else if (key == 'u') {
+    oscAmpThresh++;
+  }
+  else if (key == 'd') {
+    oscAmpThresh--;
+  }
   
   
 }
@@ -113,4 +133,15 @@ void stop()
   minim.stop();
   
   super.stop();
+}
+
+void sendOSCMessage(int binNum, int val) {
+  /* in the following different ways of creating osc messages are shown by example */
+  OscMessage myMessage = new OscMessage("/fft");
+  
+  myMessage.add(binNum); /* add an int to the osc message */
+  myMessage.add(val);
+
+  /* send the message */
+  oscP5.send(myMessage, myRemoteLocation); 
 }

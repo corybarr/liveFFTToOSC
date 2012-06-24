@@ -9,6 +9,8 @@ String windowName;
 int numBands = 24;
 int curNumBands;
 
+float oscAmpThresh = 10;
+
 void setup()
 {
   size(512, 400);
@@ -32,6 +34,7 @@ void setup()
 
 
 void drawRaw() {
+  stroke(0, 0, 255);
   for(int i = 0; i < fft.specSize(); i++)
   {
     // draw the line for frequency band i, scaling it by 4 so we can see it a bit better
@@ -40,22 +43,27 @@ void drawRaw() {
 }
 
 void drawAverages() {
-  int w = int(width/fft.avgSize());
+  int w = int(width / fft.avgSize());
+  
+  int scaleFactor = 5; //for visibility
+  
+  stroke(255);
   for(int i = 0; i < fft.avgSize(); i++)
   {
     // draw a rectangle for each average, multiply the value by 5 so we can see it better
-    rect(i * w, height, i * w + w, height - fft.getAvg(i) * 5);
+    //rect(i * w, height / 2, i * w + w, height / 2 - fft.getAvg(i) * scaleFactor);
+    rect(i * w, height - fft.getAvg(i) * scaleFactor, w, fft.getAvg(i) * scaleFactor);
   }
+  
+  stroke(255, 0, 0);
+  line (0, height - oscAmpThresh * scaleFactor, width, height - oscAmpThresh * scaleFactor);
 }
 
 void draw()
 {
   background(0);
-  
-  //draw line partitioning raw FFT from OSC message visualization
-  line(0, height / 2, width, height / 2);
-  
-  stroke(255);
+    
+  //stroke(0, 0, 255);
   
   if (curNumBands != numBands) {
     numBands = curNumBands;
@@ -68,7 +76,7 @@ void draw()
   drawRaw();
   drawAverages();
 
-  fill(255);
+  //fill(255);
   // keep us informed about the window being used
   text(windowName + "+/- changes bands", 5, 20);
 }

@@ -6,12 +6,16 @@ Minim minim;
 AudioInput in;
 FFT fft;
 String windowName;
+int numBands = 24;
+int curNumBands;
 
 void setup()
 {
-  size(512, 200);
+  size(512, 400);
   minim = new Minim(this);
   in = minim.getLineIn(Minim.STEREO, 2048);
+  
+  curNumBands = numBands;
   
   //jingle = minim.loadFile("drum_solo.mp3", 2048);
   //jingle.loop();
@@ -19,25 +23,54 @@ void setup()
   // note that this needs to be a power of two and that it means the size of the spectrum
   // will be 512. see the online tutorial for more info.
   fft = new FFT(in.bufferSize(), in.sampleRate());
+  fft.linAverages(numBands);
+  fft.window(FFT.HAMMING);
+
   textFont(createFont("SanSerif", 12));
-  windowName = "None";
+  windowName = String.valueOf(numBands) + " bands";
+}
+
+
+void drawRaw() {
+  for(int i = 0; i < fft.specSize(); i++)
+  {
+    // draw the line for frequency band i, scaling it by 4 so we can see it a bit better
+    line(i, height / 2, i, height / 2 - fft.getBand(i)*4);
+  }
+}
+
+void drawAverages() {
+  int w = int(width/fft.avgSize());
+  for(int i = 0; i < fft.avgSize(); i++)
+  {
+    // draw a rectangle for each average, multiply the value by 5 so we can see it better
+    rect(i * w, height, i * w + w, height - fft.getAvg(i) * 5);
+  }
 }
 
 void draw()
 {
   background(0);
+  
+  //draw line partitioning raw FFT from OSC message visualization
+  line(0, height / 2, width, height / 2);
+  
   stroke(255);
-  // perform a forward FFT on the samples in jingle's left buffer
-  // note that if jingle were a MONO file, this would be the same as using jingle.right or jingle.left
-  fft.forward(in.mix);
-  for(int i = 0; i < fft.specSize(); i++)
-  {
-    // draw the line for frequency band i, scaling it by 4 so we can see it a bit better
-    line(i, height, i, height - fft.getBand(i)*4);
+  
+  if (curNumBands != numBands) {
+    numBands = curNumBands;
+    fft.linAverages(numBands);
+    windowName = String.valueOf(numBands) + " bands";
   }
+  
+  fft.forward(in.left);
+
+  drawRaw();
+  drawAverages();
+
   fill(255);
   // keep us informed about the window being used
-  text("The window being used is: " + windowName, 5, 20);
+  text(windowName + "+/- changes bands", 5, 20);
 }
 
 void keyReleased()
@@ -46,15 +79,23 @@ void keyReleased()
   {
     // a Hamming window can be used to shape the sample buffer that is passed to the FFT
     // this can reduce the amount of noise in the spectrum
-    fft.window(FFT.HAMMING);
     windowName = "Hamming";
   }
   
-  if ( key == 'e' ) 
+  else if ( key == 'e' ) 
   {
     fft.window(FFT.NONE);
     windowName = "None";
   }
+  
+  else if (key == '+') {
+    curNumBands++;
+  }
+  else if (key == '-') {
+    curNumBands--;
+  }
+  
+  
 }
 
 void stop()

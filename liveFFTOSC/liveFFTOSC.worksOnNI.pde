@@ -1,5 +1,7 @@
 import ddf.minim.analysis.*;
 import ddf.minim.*;
+import controlP5.*;
+import javax.sound.sampled.*;
 
 Minim minim;
 //AudioPlayer jingle;
@@ -9,19 +11,26 @@ String windowName;
 int numBands = 24;
 int curNumBands;
 
-float oscAmpThresh = 5;
+// an array of info objects describing all of 
+// the mixers the AudioSystem has. we'll use
+// this to populate our gui scroll list and
+// also to obtain an actual Mixer when the
+// user clicks on an item in the list.
+Mixer.Info[] mixerInfo;
+int mixerIndex = 0; //7 is the NI input
 
-//for OSC
-import oscP5.*;
-import netP5.*;
-OscP5 oscP5;
-NetAddress myRemoteLocation;
+float oscAmpThresh = 10;
 
 void setup()
 {
   size(512, 400);
   minim = new Minim(this);
   in = minim.getLineIn(Minim.STEREO, 2048);
+  
+  mixerInfo = AudioSystem.getMixerInfo();
+  println("Using mixer info " + mixerInfo[mixerIndex].getName());
+  Mixer mixer = AudioSystem.getMixer(mixerInfo[mixerIndex]);
+  minim.setInputMixer(mixer);
   
   curNumBands = numBands;
   
@@ -37,8 +46,6 @@ void setup()
   textFont(createFont("SanSerif", 12));
   windowName = String.valueOf(numBands) + " bands";
   
-  oscP5 = new OscP5(this, 12000);
-  myRemoteLocation = new NetAddress("localhost", 57001);
 }
 
 
@@ -61,15 +68,7 @@ void drawAverages() {
   {
     // draw a rectangle for each average, multiply the value by 5 so we can see it better
     //rect(i * w, height / 2, i * w + w, height / 2 - fft.getAvg(i) * scaleFactor);
-    if (fft.getAvg(i) > oscAmpThresh) {
-      sendOSCMessage(i, fft.getAvg(i));
-      fill(0, 255, 0);
-    }
     rect(i * w, height - fft.getAvg(i) * scaleFactor, w, fft.getAvg(i) * scaleFactor);
-    if (fft.getAvg(i) > oscAmpThresh) {
-      
-      fill(255);
-    }
   }
   
   stroke(255, 0, 0);
@@ -80,20 +79,22 @@ void draw()
 {
   background(0);
     
+  //stroke(0, 0, 255);
+  
   if (curNumBands != numBands) {
     numBands = curNumBands;
     fft.linAverages(numBands);
     windowName = String.valueOf(numBands) + " bands";
   }
   
-  fft.forward(in.left);
+  fft.forward(in.mix);
 
   drawRaw();
   drawAverages();
 
   //fill(255);
   // keep us informed about the window being used
-  text(windowName + " (+/- changes bands, u/d changes amplitude thresh)", 5, 20);
+  text(windowName + "+/- changes bands", 5, 20);
 }
 
 void keyReleased()
@@ -117,14 +118,19 @@ void keyReleased()
   else if (key == '-') {
     curNumBands--;
   }
-
-  else if (key == 'u') {
-    oscAmpThresh++;
-  }
-  else if (key == 'd') {
-    oscAmpThresh--;
-  }
   
+  else if (key == 't') {
+      if ( in != null )
+    {
+      in.close();
+    }
+  
+    mixerIndex++;
+    println("Using mixer info " + mixerInfo[mixerIndex].getName());
+    Mixer mixer = AudioSystem.getMixer(mixerInfo[mixerIndex]);
+    minim.setInputMixer(mixer);
+    in = minim.getLineIn(Minim.STEREO);
+  }
   
 }
 
@@ -135,16 +141,4 @@ void stop()
   minim.stop();
   
   super.stop();
-}
-
-void sendOSCMessage(int binNum, float val) {
-  /* in the following different ways of creating osc messages are shown by example */
-  OscMessage myMessage = new OscMessage("/acw");
-  myMessage.add("cc");
-  myMessage.add(15);
-  //myMessage.add(binNum); /* add an int to the osc message */
-  myMessage.add(val);
-
-  /* send the message */
-  oscP5.send(myMessage, myRemoteLocation); 
 }

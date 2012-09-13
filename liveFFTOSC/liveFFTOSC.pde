@@ -8,8 +8,9 @@ FFT fft;
 String windowName;
 int numBands = 24;
 int curNumBands;
-
+int scaleFactor = 5;
 float oscAmpThresh = 5;
+float currBinVals[];
 
 //for OSC
 import oscP5.*;
@@ -24,6 +25,7 @@ void setup()
   in = minim.getLineIn(Minim.STEREO, 2048);
   
   curNumBands = numBands;
+  currBinVals = new float[numBands];
   
   //jingle = minim.loadFile("drum_solo.mp3", 2048);
   //jingle.loop();
@@ -38,7 +40,7 @@ void setup()
   windowName = String.valueOf(numBands) + " bands";
   
   oscP5 = new OscP5(this, 12000);
-  myRemoteLocation = new NetAddress("localhost", 57001);
+  myRemoteLocation = new NetAddress("127.0.0.1", 57001);
 }
 
 
@@ -54,24 +56,25 @@ void drawRaw() {
 void drawAverages() {
   int w = int(width / fft.avgSize());
   
-  int scaleFactor = 5; //for visibility
-  
   stroke(255);
   for(int i = 0; i < fft.avgSize(); i++)
   {
-    // draw a rectangle for each average, multiply the value by 5 so we can see it better
-    //rect(i * w, height / 2, i * w + w, height / 2 - fft.getAvg(i) * scaleFactor);
-    if (fft.getAvg(i) > oscAmpThresh) {
-      sendOSCMessage(i, fft.getAvg(i));
+    float currAvg = fft.getAvg(i);
+    
+    currBinVals[i] = currAvg;
+    
+    if (currAvg > oscAmpThresh) {
+      sendOSCMessage(i, currAvg);
       fill(0, 255, 0);
     }
-    rect(i * w, height - fft.getAvg(i) * scaleFactor, w, fft.getAvg(i) * scaleFactor);
-    if (fft.getAvg(i) > oscAmpThresh) {
-      
+    
+    // draw a rectangle for each average, multiply the value by scaleFactor so we can see it better
+    rect(i * w, height - currAvg * scaleFactor, w, currAvg * scaleFactor);
+    
+    if (currAvg > oscAmpThresh) {
       fill(255);
     }
   }
-  
   stroke(255, 0, 0);
   line (0, height - oscAmpThresh * scaleFactor, width, height - oscAmpThresh * scaleFactor);
 }
@@ -82,6 +85,7 @@ void draw()
     
   if (curNumBands != numBands) {
     numBands = curNumBands;
+    currBinVals = new float[numBands];
     fft.linAverages(numBands);
     windowName = String.valueOf(numBands) + " bands";
   }
@@ -147,4 +151,5 @@ void sendOSCMessage(int binNum, float val) {
 
   /* send the message */
   oscP5.send(myMessage, myRemoteLocation); 
+  println("sent message: " + myMessage);
 }

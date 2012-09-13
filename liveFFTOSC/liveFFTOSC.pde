@@ -11,6 +11,7 @@ int curNumBands;
 int scaleFactor = 5;
 float oscAmpThresh = 5;
 float currBinVals[];
+float currFrameMaxAvgVal = 0;
 
 //for OSC
 import oscP5.*;
@@ -53,28 +54,53 @@ void drawRaw() {
   }
 }
 
+void analyzeFrame() {
+  
+  // reset max value
+  currFrameMaxAvgVal = 0;
+  
+  for (int i = 0; i < fft.avgSize(); i++) {
+    
+    // get current bin avg val
+    float currAvg = fft.getAvg(i);    
+    
+    // set currBinAvg val in array
+    currBinVals[i] = currAvg;
+    
+    // adjust local max val variable if necessary
+    if (currAvg > currFrameMaxAvgVal) {
+      currFrameMaxAvgVal = currAvg;
+    }
+    
+  }
+  
+}
+
+
 void drawAverages() {
   int w = int(width / fft.avgSize());
   
   stroke(255);
+  
+  float maxBinAvgVal = 0;
+  
   for(int i = 0; i < fft.avgSize(); i++)
   {
-    float currAvg = fft.getAvg(i);
+    // get current bin avg val
+    float currAvg = fft.getAvg(i);    
     
-    currBinVals[i] = currAvg;
-    
+    // if currAvg is greater than threshold we fill with green otherwise, white
     if (currAvg > oscAmpThresh) {
-      sendOSCMessage(i, currAvg);
       fill(0, 255, 0);
+    } else {
+      fill(255);
     }
     
     // draw a rectangle for each average, multiply the value by scaleFactor so we can see it better
-    rect(i * w, height - currAvg * scaleFactor, w, currAvg * scaleFactor);
-    
-    if (currAvg > oscAmpThresh) {
-      fill(255);
-    }
+    rect(i * w, height - currAvg * scaleFactor, w, currAvg * scaleFactor);    
   }
+  
+  // draw a red line to indicate our current threshold value
   stroke(255, 0, 0);
   line (0, height - oscAmpThresh * scaleFactor, width, height - oscAmpThresh * scaleFactor);
 }
@@ -94,8 +120,15 @@ void draw()
 
   drawRaw();
   drawAverages();
+  
+  // populate the currBinVals array and the currFrameMaxAvgVal variable
+  analyzeFrame();
+  
+  // TODO: currently only sending a single message with the max value for each frame
+  if (currFrameMaxAvgVal > oscAmpThresh) {
+    sendOSCMessage(currFrameMaxAvgVal);        
+  }
 
-  //fill(255);
   // keep us informed about the window being used
   text(windowName + " (+/- changes bands, u/d changes amplitude thresh)", 5, 20);
 }
@@ -141,12 +174,12 @@ void stop()
   super.stop();
 }
 
-void sendOSCMessage(int binNum, float val) {
+void sendOSCMessage(float val) {
   /* in the following different ways of creating osc messages are shown by example */
   OscMessage myMessage = new OscMessage("/acw");
   myMessage.add("cc");
   myMessage.add(15);
-  //myMessage.add(binNum); /* add an int to the osc message */
+
   myMessage.add(val);
 
   /* send the message */

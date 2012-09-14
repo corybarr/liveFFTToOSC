@@ -126,7 +126,7 @@ void draw()
   
   // TODO: currently only sending a single message with the max value for each frame
   if (currFrameMaxAvgVal > oscAmpThresh) {
-    sendOSCMessage(currFrameMaxAvgVal);        
+    sendOSCMessage(currFrameMaxAvgVal, currBinVals);        
   }
 
   // keep us informed about the window being used
@@ -174,13 +174,16 @@ void stop()
   super.stop();
 }
 
-void sendOSCMessage(float val) {
-  /* in the following different ways of creating osc messages are shown by example */
+void sendOSCMessage(float val, float[] binVals) {
   OscMessage myMessage = new OscMessage("/acw");
   myMessage.add("cc");
   myMessage.add(15);
 
   myMessage.add(val);
+  if (binVals != null) {
+    myMessage.add(binVals);
+  }
+
 
   /* send the message */
   oscP5.send(myMessage, myRemoteLocation); 

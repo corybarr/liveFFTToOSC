@@ -1,10 +1,20 @@
 import ddf.minim.analysis.*;
 import ddf.minim.*;
+import codeanticode.syphon.*;
+import oscP5.*;
+import netP5.*;
+
+
+static final boolean SYPHON_ENABLED = false;
+
 
 Minim minim;
-//AudioPlayer jingle;
 AudioInput in;
 FFT fft;
+
+PGraphics canvas;
+SyphonServer server;
+
 String windowName;
 int numBands = 24;
 int curNumBands;
@@ -14,14 +24,21 @@ float currBinVals[];
 float currFrameMaxAvgVal = 0;
 
 //for OSC
-import oscP5.*;
-import netP5.*;
 OscP5 oscP5;
 NetAddress myRemoteLocation;
 
 void setup()
 {
-  size(512, 400);
+  size(512, 400, P3D);
+  
+  // Create canvas to draw to for syphon image
+  canvas = createGraphics(512, 400, P3D);
+  
+  if (SYPHON_ENABLED) {
+    // Create syhpon server to send frames out.
+      server = new SyphonServer(this, "Processing Syphon");    
+  }
+  
   minim = new Minim(this);
   in = minim.getLineIn(Minim.STEREO, 2048);
   
@@ -37,7 +54,7 @@ void setup()
   fft.linAverages(numBands);
   fft.window(FFT.HAMMING);
 
-  textFont(createFont("SanSerif", 12));
+  //canvas.textFont(createFont("SanSerif", 12));
   windowName = String.valueOf(numBands) + " bands";
   
   oscP5 = new OscP5(this, 12000);
@@ -46,11 +63,11 @@ void setup()
 
 
 void drawRaw() {
-  stroke(0, 0, 255);
+  canvas.stroke(0, 0, 255);
   for(int i = 0; i < fft.specSize(); i++)
   {
     // draw the line for frequency band i, scaling it by 4 so we can see it a bit better
-    line(i, height / 2, i, height / 2 - fft.getBand(i)*4);
+    canvas.line(i, height / 2, i, height / 2 - fft.getBand(i)*4);
   }
 }
 
@@ -80,7 +97,7 @@ void analyzeFrame() {
 void drawAverages() {
   int w = int(width / fft.avgSize());
   
-  stroke(255);
+  canvas.stroke(255);
   
   float maxBinAvgVal = 0;
   
@@ -91,23 +108,25 @@ void drawAverages() {
     
     // if currAvg is greater than threshold we fill with green otherwise, white
     if (currAvg > oscAmpThresh) {
-      fill(0, 255, 0);
+      canvas.fill(0, 255, 0);
     } else {
-      fill(255);
+      canvas.fill(255);
     }
     
     // draw a rectangle for each average, multiply the value by scaleFactor so we can see it better
-    rect(i * w, height - currAvg * scaleFactor, w, currAvg * scaleFactor);    
+    canvas.rect(i * w, height - currAvg * scaleFactor, w, currAvg * scaleFactor);    
   }
   
   // draw a red line to indicate our current threshold value
-  stroke(255, 0, 0);
-  line (0, height - oscAmpThresh * scaleFactor, width, height - oscAmpThresh * scaleFactor);
+  canvas.stroke(255, 0, 0);
+  canvas.line (0, height - oscAmpThresh * scaleFactor, width, height - oscAmpThresh * scaleFactor);
 }
 
 void draw()
 {
-  background(0);
+  canvas.beginDraw();
+  
+  canvas.background(0);
     
   if (curNumBands != numBands) {
     numBands = curNumBands;
@@ -118,8 +137,17 @@ void draw()
   
   fft.forward(in.left);
 
+  
   drawRaw();
   drawAverages();
+  canvas.endDraw();
+  
+  // draw canvas to window
+  image(canvas, 0, 0);
+  
+  if (SYPHON_ENABLED) {
+    server.sendImage(canvas); 
+  }
   
   // populate the currBinVals array and the currFrameMaxAvgVal variable
   analyzeFrame();
@@ -130,7 +158,7 @@ void draw()
   }
 
   // keep us informed about the window being used
-  text(windowName + " (+/- changes bands, u/d changes amplitude thresh)", 5, 20);
+  //canvas.text(windowName + " (+/- changes bands, u/d changes amplitude thresh)", 5, 20);
 }
 
 void keyReleased()
@@ -178,6 +206,7 @@ void sendOSCMessage(float val, float[] binVals) {
   OscMessage myMessage = new OscMessage("/acw");
   myMessage.add("cc");
   myMessage.add(15);
+  myMessage.add(binVals.length);
 
   myMessage.add(val);
   if (binVals != null) {

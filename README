@@ -1,0 +1,6 @@
+To run:
+- move all unzipped folders in libraries directory to your 'libraries' folder in your processing sketchbook location
+- restart processing
+
+To enable Syphon (need processing 2.0a4+):
+- flip the boolean

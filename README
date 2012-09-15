@@ -1,6 +1,18 @@
-To run:
-- move all unzipped folders in libraries directory to your 'libraries' folder in your processing sketchbook location
-- restart processing
+*To run*
+- Add libraries if you don't already have them
+  > move all unzipped folders in libraries directory to your 'libraries' folder in your processing sketchbook location
+  > restart processing
 
-To enable Syphon (need processing 2.0a4+):
+*To enable Syphon (need processing 2.0a4+)*
 - flip the boolean
+
+*OSC Message Structure*
+- Values
+  [0] (int) - name of command (e.g. cc)
+  [1] (int) - channel for command (e.g. 15)
+  [2] (int) - number of fft bins (e.g. 24)
+  [3] ... [n+3] (float) value of single bin at fft bin index n - 3
+
+
+
+

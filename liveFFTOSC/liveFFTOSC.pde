@@ -6,7 +6,7 @@ import netP5.*;
 
 
 
-static final boolean SYPHON_ENABLED = false;
+static final boolean SYPHON_ENABLED = true;
 
 
 
@@ -154,7 +154,7 @@ void draw()
   
   canvas.beginDraw();
   
-  canvas.background(0);
+  canvas.background(0, 0, 0, 15);
     
   if (curNumBands != numBands) {
     numBands = curNumBands;

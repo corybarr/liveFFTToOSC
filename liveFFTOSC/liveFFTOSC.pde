@@ -5,8 +5,19 @@ import oscP5.*;
 import netP5.*;
 
 
+
 static final boolean SYPHON_ENABLED = false;
 
+
+
+static final int DRAW_MODE_DEBUG = 1;
+static final int DRAW_MODE_RAW_ONLY = 2;
+
+static final int OSC_MODE_THRESHOLD = 1;
+static final int OSC_MODE_ALL_MESSAGES = 2;
+
+int drawMode = 1;
+int OSCMode = 1;
 
 Minim minim;
 AudioInput in;
@@ -26,6 +37,14 @@ float currFrameMaxAvgVal = 0;
 //for OSC
 OscP5 oscP5;
 NetAddress myRemoteLocation;
+
+// draw params
+int baselineHeight = 20;
+color rawStrokeColor = color(0, 0, 255);
+color avgStrokeColor = color(255);
+color avgFillColor = color(255);
+color avgEnabledFillColor = color(0, 255, 0);
+
 
 void setup()
 {
@@ -63,13 +82,50 @@ void setup()
 
 
 void drawRaw() {
-  canvas.stroke(0, 0, 255);
+  canvas.stroke(rawStrokeColor);
   for(int i = 0; i < fft.specSize(); i++)
   {
     // draw the line for frequency band i, scaling it by 4 so we can see it a bit better
-    canvas.line(i, height / 2, i, height / 2 - fft.getBand(i)*4);
+    canvas.line(i, height, i, height - baselineHeight - fft.getBand(i)*4);
+    
+    if (drawMode == DRAW_MODE_DEBUG) {
+      fill(rawStrokeColor);
+    
+    }
+    
   }
 }
+
+void drawAverages() {
+  int w = int(width / fft.avgSize());
+  
+  canvas.stroke(avgStrokeColor);
+  
+  float maxBinAvgVal = 0;
+  
+  for(int i = 0; i < fft.avgSize(); i++)
+  {
+    // get current bin avg val
+    float currAvg = fft.getAvg(i);    
+    
+    // if currAvg is greater than threshold we fill with green otherwise, white
+    if (currAvg > oscAmpThresh) {
+      canvas.fill(avgEnabledFillColor);
+    } else {
+      canvas.fill(avgFillColor);
+    }
+    
+    int bottomStrokeOffset = 2; // draw a couple pixels below the bottom so we can draw over top of the rectangle's bottom stroke
+    
+    // draw a rectangle for each average, multiply the value by scaleFactor so we can see it better
+    canvas.rect(i * w, height - baselineHeight - bottomStrokeOffset - currAvg * scaleFactor, w, currAvg * scaleFactor);    
+  }
+  
+  // draw a red line to indicate our current threshold value
+  canvas.stroke(255, 0, 0);
+  canvas.line (0, height - baselineHeight - oscAmpThresh * scaleFactor, width, height - baselineHeight - oscAmpThresh * scaleFactor);
+}
+
 
 void analyzeFrame() {
   
@@ -93,37 +149,9 @@ void analyzeFrame() {
   
 }
 
-
-void drawAverages() {
-  int w = int(width / fft.avgSize());
-  
-  canvas.stroke(255);
-  
-  float maxBinAvgVal = 0;
-  
-  for(int i = 0; i < fft.avgSize(); i++)
-  {
-    // get current bin avg val
-    float currAvg = fft.getAvg(i);    
-    
-    // if currAvg is greater than threshold we fill with green otherwise, white
-    if (currAvg > oscAmpThresh) {
-      canvas.fill(0, 255, 0);
-    } else {
-      canvas.fill(255);
-    }
-    
-    // draw a rectangle for each average, multiply the value by scaleFactor so we can see it better
-    canvas.rect(i * w, height - currAvg * scaleFactor, w, currAvg * scaleFactor);    
-  }
-  
-  // draw a red line to indicate our current threshold value
-  canvas.stroke(255, 0, 0);
-  canvas.line (0, height - oscAmpThresh * scaleFactor, width, height - oscAmpThresh * scaleFactor);
-}
-
 void draw()
 {
+  
   canvas.beginDraw();
   
   canvas.background(0);
@@ -137,9 +165,28 @@ void draw()
   
   fft.forward(in.left);
 
-  
   drawRaw();
-  drawAverages();
+  
+  if (drawMode == DRAW_MODE_DEBUG) {
+    
+    drawAverages();    
+    
+    // show keyboard commands
+    canvas.text(" (+/- changes bands, u/d changes amplitude thresh, 'o' OSCMode, 'SPACE' Draw Mode)", 5, 20);
+    // keep us informed about the window being used
+     canvas.text(windowName, 5, 40);
+     
+    // show current OSCMode
+    String oscModeString = null;
+    if (OSCMode == OSC_MODE_ALL_MESSAGES) {
+      oscModeString = "ALL_MESSAGES"; 
+    } else {
+      oscModeString = "THRESHOLD";
+    } 
+    canvas.text("OSCMode:  " + oscModeString, 5, 60);
+  }
+
+   
   canvas.endDraw();
   
   // draw canvas to window
@@ -151,18 +198,15 @@ void draw()
   
   // populate the currBinVals array and the currFrameMaxAvgVal variable
   analyzeFrame();
+
   
-  // TODO: currently only sending a single message with the max value for each frame
-  if (currFrameMaxAvgVal > oscAmpThresh) {
+  // will send OSC if OSC_MODE_ALL_MESSAGES is enabled or the frame's max value is above a threshold
+  if (OSCMode == OSC_MODE_ALL_MESSAGES || currFrameMaxAvgVal > oscAmpThresh) {
     sendOSCMessage(currFrameMaxAvgVal, currBinVals);        
   }
-
-  // keep us informed about the window being used
-  //canvas.text(windowName + " (+/- changes bands, u/d changes amplitude thresh)", 5, 20);
 }
 
-void keyReleased()
-{
+void keyPressed() {
   if ( key == 'w' ) 
   {
     // a Hamming window can be used to shape the sample buffer that is passed to the FFT
@@ -185,12 +229,24 @@ void keyReleased()
 
   else if (key == 'u') {
     oscAmpThresh++;
+    println("Up key");
   }
   else if (key == 'd') {
     oscAmpThresh--;
   }
-  
-  
+  else if (key == 'o') {
+    if (OSCMode == OSC_MODE_THRESHOLD) {
+      OSCMode = OSC_MODE_ALL_MESSAGES;
+    } else {
+      OSCMode = OSC_MODE_THRESHOLD;
+    }
+  } else if (key == ' ') {
+    if (drawMode == DRAW_MODE_DEBUG) {
+      drawMode = DRAW_MODE_RAW_ONLY;
+    } else {
+      drawMode = DRAW_MODE_DEBUG;
+    }
+  }
 }
 
 void stop()

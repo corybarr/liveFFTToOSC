@@ -39,7 +39,7 @@ OscP5 oscP5;
 NetAddress myRemoteLocation;
 
 // draw params
-int baselineHeight = 20;
+int baselineHeight = 0;
 color rawStrokeColor = color(0, 0, 255);
 color avgStrokeColor = color(255);
 color avgFillColor = color(255);
@@ -82,17 +82,64 @@ void setup()
 
 
 void drawRaw() {
+  
   canvas.stroke(rawStrokeColor);
+  
+  //color bottomColor = color(0,0,255);
+  //color topColor = color(255,0,0);
+  
   for(int i = 0; i < fft.specSize(); i++)
   {
     // draw the line for frequency band i, scaling it by 4 so we can see it a bit better
-    canvas.line(i, height, i, height - baselineHeight - fft.getBand(i)*4);
+    //canvas.line(i, height, i, height - baselineHeight - fft.getBand(i)*4);
+    
+    /*
+    canvas.stroke(bottomColor);
+    canvas.line(i, height, i, height - baselineHeight - fft.getBand(i)*2 );
+    canvas.stroke(topColor);
+    canvas.line(i, height - baselineHeight - fft.getBand(i)*2, i, height - baselineHeight - fft.getBand(i)*4);
+    */
     
     if (drawMode == DRAW_MODE_DEBUG) {
       fill(rawStrokeColor);
-    
     }
-    
+  }
+  
+  color bottomColor = color(0,0,255);
+  color topColor = color(244,0,0);
+  
+  int numWindowDivisions = height / 2;
+  int divisionHeight = height / numWindowDivisions;
+
+   
+  for(int i = 0; i < fft.specSize(); i++)
+  {
+   
+   float bandHeight = fft.getBand(i)*8;
+   
+   float bandWindowRatio = bandHeight / height;
+   
+   // don't let ratio get over 1.0
+   if (bandWindowRatio > 1) {
+     bandWindowRatio = 1;
+   }
+   
+   float numBandDivisions = bandWindowRatio * numWindowDivisions;
+   //println(numBandDivisions);
+   
+   // draw bottom band
+   canvas.line(i, height, i, height - baselineHeight);
+   
+   float tempBottom = height - baselineHeight;
+   
+   // draw color sections
+   for (int a = 0; a < numBandDivisions; a++) {
+     float inter = map(a, 0, numWindowDivisions, 0, 1);
+     color c = lerpColor(bottomColor, topColor, inter);
+     canvas.stroke(c);
+     canvas.line(i, tempBottom, i, tempBottom - divisionHeight);
+     tempBottom -= divisionHeight;
+   }   
   }
 }
 
